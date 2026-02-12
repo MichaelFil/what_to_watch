@@ -1,54 +1,10 @@
-from datetime import datetime
 from random import randrange
 
-from flask import Flask, redirect, render_template, url_for
-from flask_sqlalchemy import SQLAlchemy
+from flask import abort, flash, redirect, render_template, url_for
 
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField, TextAreaField, URLField
-from wtforms.validators import DataRequired, Length, Optional
-
-
-app = Flask(__name__, static_folder='static')
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
-app.config['SECRET_KEY'] = 'fdmnvfnnnLKDLMkmomjnJNONOIMLF261651652!@$FE668'
-
-db = SQLAlchemy(app)
-# Применять только символы из набора ASCII? Нет!
-# app.json.ensure_ascii = False
-
-
-class Opinion(db.Model):
-    # ID — целое число, первичный ключ.
-    id = db.Column(db.Integer, primary_key=True)
-    # Название фильма — строка длиной 128 символов, не может быть пустым.
-    title = db.Column(db.String(128), nullable=False)
-    # Мнение о фильме — большая строка, не может быть пустым,
-    # должно быть уникальным.
-    text = db.Column(db.Text, unique=True, nullable=False)
-    # Ссылка на сторонний источник — строка длиной 256 символов.
-    source = db.Column(db.String(256))
-    # Дата и время — текущее время,
-    # по этому столбцу база данных будет проиндексирована.
-    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
-
-
-class OpinionForm(FlaskForm):
-    title = StringField(
-        'Введите название фильма',
-        validators=[DataRequired(message='Обязательное поле'),
-                    Length(1, 128)]
-    )
-    text = TextAreaField(
-        'Напишите мнение',
-        validators=[DataRequired(message='Обязательное поле')]
-    )
-    source = URLField(
-        'Добавьте ссылку на подробный обзор фильма',
-        validators=[Length(1, 256), Optional()]
-    )
-    submit = SubmitField('Добавить')
+from . import app, db
+from .forms import OpinionForm
+from .models import Opinion
 
 
 @app.route('/')
@@ -57,8 +13,9 @@ def index_view():
     quantity = Opinion.query.count()
     # Если мнений нет...
     if not quantity:
+        abort(500)
         # ...то вернуть сообщение:
-        return 'В базе данных мнений о фильмах нет.'
+        # return 'В базе данных мнений о фильмах нет.'
     # Иначе выбрать случайное число в диапазоне от 0 до quantity...
     offset_value = randrange(quantity)
     # ...и определить случайный объект.
@@ -81,6 +38,13 @@ def add_opinion_view():
     form = OpinionForm()
     # Если ошибок не возникло...
     if form.validate_on_submit():
+        text = form.text.data
+        # Если в БД уже есть мнение с текстом, который ввёл пользователь...
+        if Opinion.query.filter_by(text=text).first() is not None:
+            # ...вызвать функцию flash и передать соответствующее сообщение.
+            flash('Такое мнение уже было оставлено ранее!')
+            # Вернуть пользователя на страницу «Добавить новое мнение».
+            return render_template('add_opinion.html', form=form)
         # ...то нужно создать новый экземпляр класса Opinion...
         opinion = Opinion(
             # ...и передать в него данные, полученные из формы.
@@ -96,7 +60,3 @@ def add_opinion_view():
         return redirect(url_for('opinion_view', id=opinion.id))
     # Если валидация не пройдена - просто отрисовать страницу с формой.
     return render_template('add_opinion.html', form=form)
-
-
-if __name__ == '__main__':
-    app.run()
