@@ -3,6 +3,7 @@ from random import randrange
 from flask import abort, flash, redirect, render_template, url_for
 
 from . import app, db
+from .dropbox import upload_files_to_dropbox
 from .forms import OpinionForm
 from .models import Opinion
 
@@ -46,12 +47,14 @@ def add_opinion_view():
             flash('Такое мнение уже было оставлено ранее!')
             # Вернуть пользователя на страницу «Добавить новое мнение».
             return render_template('add_opinion.html', form=form)
+        urls = upload_files_to_dropbox(form.images.data)
         # ...то нужно создать новый экземпляр класса Opinion...
         opinion = Opinion(
             # ...и передать в него данные, полученные из формы.
             title=form.title.data,
             text=form.text.data,
-            source=form.source.data
+            source=form.source.data,
+            images=urls
         )
         # Затем добавить его в сессию работы с базой данных...
         db.session.add(opinion)
