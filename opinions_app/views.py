@@ -3,7 +3,7 @@ from random import randrange
 from flask import abort, flash, redirect, render_template, url_for
 
 from . import app, db
-from .dropbox import upload_files_to_dropbox
+from .dropbox import async_upload_files_to_dropbox  # upload_files_to_dropbox
 from .forms import OpinionForm
 from .models import Opinion
 
@@ -36,7 +36,7 @@ def opinion_view(id):
 
 
 @app.route('/add', methods=['GET', 'POST'])
-def add_opinion_view():
+async def add_opinion_view():
     form = OpinionForm()
     # Если ошибок не возникло...
     if form.validate_on_submit():
@@ -47,7 +47,7 @@ def add_opinion_view():
             flash('Такое мнение уже было оставлено ранее!')
             # Вернуть пользователя на страницу «Добавить новое мнение».
             return render_template('add_opinion.html', form=form)
-        urls = upload_files_to_dropbox(form.images.data)
+        urls = await async_upload_files_to_dropbox(form.images.data)
         # ...то нужно создать новый экземпляр класса Opinion...
         opinion = Opinion(
             # ...и передать в него данные, полученные из формы.
